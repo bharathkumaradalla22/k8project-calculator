@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: calculator-app
+---
+# BACKEND DEPLOYMENT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: calculator-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: python-backend
+        # CHANGE: Use your custom image instead of python:3.9-slim
+        image: bharathadalla/calculator-backend:v2 
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5 # Reduced because image is pre-built
+---
+# BACKEND SERVICE (INTERNAL)
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: calculator-app
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+---
+# BACKEND SERVICE (EXTERNAL ACCESS FOR BROWSER)
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service-nodeport
+  namespace: calculator-app
+spec:
+  type: NodePort
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+      nodePort: 30008
+---
+# FRONTEND DEPLOYMENT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: calculator-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: nginx-frontend
+        # CHANGE: Use your custom image
+        image: bharathadalla/k8s-calculator-frontend:v2
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "25m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+---
+# FRONTEND SERVICE
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: calculator-app
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30007
